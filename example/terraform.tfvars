@@ -1,6 +1,10 @@
+# cluster name!
 cluster_name         = "bart"
+
+# if you want to add any "insecure" registries to the nodes, add them here
 insecure_registries = [ "registry.k8s.lab" ]
 
+# default node settings are inherited to all node types, you only need to override the settings you want to change
 default_node_settings = {
   nameserver   = "10.10.0.1"
   searchdomain = "k8s.lab"
@@ -20,24 +24,37 @@ default_node_settings = {
     EOF
 }
 
+# support node
 support_node_settings = {
   ip_offset = 10 * 256 + 1,
   memory = 2048
 }
 
+# 2 master nodes
 master_node_settings = {
-  count     = 1
+  count     = 2
   ip_offset = 10 * 256 + 2
   memory    = 2048
 }
 
+# 2 node pools
 node_pools = [
   {
     name      = "small"
     cores     = 2
-    size      = 2
+    size      = 25
     disk_size = "10G"
     ip_offset = 10 * 256 + 10
-    memory    = 1024
+    memory    = 2048
+    node_labels = [ "tietze.io/instance-type=small" ]
+  },
+  {
+    name      = "large"
+    cores     = 4
+    size      = 2
+    disk_size = "30G"
+    ip_offset = 10 * 256 + 100
+    memory    = 10000
+    node_labels = [ "tietze.io/instance-type=large" ]
   }
 ]
