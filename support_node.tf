@@ -17,6 +17,7 @@ resource "proxmox_vm_qemu" "k3s-support" {
   sockets     = coalesce(var.support_node_settings.sockets, var.default_node_settings.sockets)
   memory      = coalesce(var.support_node_settings.memory, var.default_node_settings.memory)
   ciuser      = local.support_node_ciuser
+  searchdomain= coalesce(var.support_node_settings.searchdomain, var.default_node_settings.searchdomain)
   ipconfig0   = "ip=${local.support_node_ip}/${split("/", local.support_node_subnet)[1]},gw=${local.gw}"
   sshkeys     = coalesce(var.support_node_settings.authorized_keys, var.default_node_settings.authorized_keys)
   nameserver  = coalesce(var.support_node_settings.nameserver, var.default_node_settings.nameserver)

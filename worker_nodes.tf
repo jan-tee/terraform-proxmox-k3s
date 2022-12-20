@@ -25,6 +25,7 @@ locals {
       ciuser  = coalesce(node.ciuser, var.default_node_settings.ciuser)
       gw      = coalesce(node.gw, var.default_node_settings.gw)
       sshkeys = coalesce(node.authorized_keys, var.default_node_settings.authorized_keys)
+      searchdomain= coalesce(node.searchdomain, var.default_node_settings.searchdomain)
     })
   }
 
@@ -49,8 +50,9 @@ resource "proxmox_vm_qemu" "k3s-worker" {
   sockets     = coalesce(each.value.sockets, var.default_node_settings.sockets)
   memory      = coalesce(each.value.memory, var.default_node_settings.memory)
   ciuser      = each.value.ciuser
+  searchdomain= each.value.searchdomain
   ipconfig0   = "ip=${each.value.ip}/${split("/", each.value.subnet)[1]},gw=${each.value.gw}"
-  sshkeys     = coalesce(each.value.authorized_keys, var.default_node_settings.authorized_keys)
+  sshkeys     = each.value.authorized_keys
   nameserver  = coalesce(each.value.nameserver, var.default_node_settings.nameserver)
   os_type     = "cloud-init"
   agent       = 1
