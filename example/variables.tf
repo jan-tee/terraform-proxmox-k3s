@@ -29,6 +29,7 @@ variable "node_pools" {
     size      = number,
     subnet    = optional(string),
     ip_offset = number,
+    searchdomain = optional(string),
     memory    = optional(number),
     cores     = optional(number),
     sockets   = optional(number),
@@ -43,6 +44,7 @@ variable "master_node_settings" {
     count     = optional(number, 2),
     subnet    = optional(string),
     ip_offset = number,
+    searchdomain = optional(string),
     memory    = optional(number),
     cores     = optional(number),
     sockets   = optional(number),
@@ -56,6 +58,7 @@ variable "support_node_settings" {
   type = object({
     subnet    = optional(string),
     ip_offset = number,
+    searchdomain = optional(string),
     memory    = optional(number),
     cores     = optional(number),
     sockets   = optional(number),
