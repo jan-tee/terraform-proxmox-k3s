@@ -26,9 +26,11 @@ A module for spinning up an expandable and flexible K3s server for your HomeLab.
 [Official Registry Page](https://registry.terraform.io/modules/fvumbaca/k3s/proxmox/latest).
 
 1. Set environment variables to access Proxmox VE:
-   ```export PM_API_URL="https://your.proxmox.server:8006/api2/json"
+   ```sh
+   export PM_API_URL="https://your.proxmox.server:8006/api2/json"
    export PM_API_TOKEN_ID="<proxmox token ID>"
-   export PM_API_TOKEN_SECRET="<proxmox token secret>"```
+   export PM_API_TOKEN_SECRET="<proxmox token secret>"
+   ```
 1. Set up SSH trust (see [example](example))
 1. Set up Terraform vars in `terraform.tfvars`.  
    Use the file from [example/](example/terraform.tfvars) as a starter.
