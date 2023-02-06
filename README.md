@@ -25,6 +25,11 @@ A module for spinning up an expandable and flexible K3s server for your HomeLab.
 > Take a look at the complete auto-generated docs on the
 [Official Registry Page](https://registry.terraform.io/modules/fvumbaca/k3s/proxmox/latest).
 
+1. Set environment variables to access Proxmox VE:
+   ```export PM_API_URL="https://your.proxmox.server:8006/api2/json"
+   export PM_API_TOKEN_ID="<proxmox token ID>"
+   export PM_API_TOKEN_SECRET="<proxmox token secret>"```
+1. Set up SSH trust (see [example](example))
 1. Set up Terraform vars in `terraform.tfvars`.  
    Use the file from [example/](example/terraform.tfvars) as a starter.
 1. Set up a `main.tf` to use the module. Edit as needed (for cluster size, node pool configuration).  
@@ -36,22 +41,12 @@ A module for spinning up an expandable and flexible K3s server for your HomeLab.
   # Test out the config:
   kubectl --kubeconfig config.yaml get nodes
   ```
+  Or use the sample scripts provided in [example](example/) to more easily
+  export kubectl config.
 
 > Make sure your support node is routable from the computer you are running the command on!
 
 ## Runbooks and Documents
 
-- [Basic cluster example](example)
+- [Cluster example](example)
 - [How to roll (update) your nodes](docs/roll-node-pools.md)
-
-## Why use nodepools and subnets?
-
-This module is designed with nodepools and subnets to allow for changes to the
-cluster composition in the future. If later on, you want to add another master
-or worker node, you can do so without needing to teardown/modify existing
-nodes. Nodepools are key if you plan to support nodes with different nodepool
-capabilities in the future without impacting other nodes.
-
-## Todo
-
-- [ ] Add variable to allow workloads on master nodes
