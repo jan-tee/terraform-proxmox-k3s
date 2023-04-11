@@ -1,4 +1,6 @@
-# cluster name!
+# This sample is a starting point for your own configuraiton.
+# Make sure to customize, and copy to terraform.tfvars for your own cluster.
+
 cluster_name         = "bart"
 
 # if you want to add any "insecure" registries to the nodes, add them here
