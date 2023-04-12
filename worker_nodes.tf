@@ -24,7 +24,7 @@ locals {
       ip      = cidrhost(node.subnet, node.i + node.ip_offset)
       ciuser  = coalesce(node.ciuser, var.default_node_settings.ciuser)
       gw      = coalesce(node.gw, var.default_node_settings.gw)
-      sshkeys = coalesce(node.authorized_keys, var.default_node_settings.authorized_keys)
+      authorized_keys = coalesce(node.authorized_keys, var.default_node_settings.authorized_keys)
       searchdomain= coalesce(node.searchdomain, var.default_node_settings.searchdomain)
     })
   }
