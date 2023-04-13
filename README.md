@@ -32,7 +32,7 @@ A module for spinning up an expandable and flexible K3s server for a lab.
    ```
 1. Set up SSH trust (see [example](example))
 1. Set up Terraform vars in `terraform.tfvars`.  
-   Use the file from [example/](example/terraform.tfvars) as a starter.
+   Use the file from [example/](example/terraform.tfvars.sampe) as a starter.
 1. Set up a `main.tf` to use the module. Edit as needed (for cluster size, node pool configuration).  
    Use the file from [example/](example/main.tf) as a starter.
 1. Run `terraform plan`, `terraform apply`.
@@ -42,8 +42,8 @@ A module for spinning up an expandable and flexible K3s server for a lab.
   # Test out the config:
   kubectl --kubeconfig config.yaml get nodes
   ```
-  Or use the sample scripts provided in [example](example/) to more easily
-  export kubectl config.
+  or use the script provided in [example/config.sh](example/config.sh) to more easily
+  export `kubectl` config.
 
 > Make sure your support node is routable from the computer you are running the command on!
 
