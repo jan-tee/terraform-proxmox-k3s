@@ -36,32 +36,34 @@ permanent home that will also keep Terraform state files for the lifetime of
 your cluster. Like with all Terraform projects, make sure you keep this
 permanently.
 
+1. Copy `terraform.vars.sample` to `terraform.vars`. Edit it to reflect your
+   desired settings
 1. Copy your public key to the `authorized_keys` variable in `terraform.tfvars`.
-   In most cases, you should be able to get this key by running 
+   In most cases, you should be able to get this key by running
    `cat ~/.ssh/id_rsa.pub`.
-2. Make sure SSH agent is running so that the key can be used to authenticate to
+1. Make sure SSH agent is running so that the key can be used to authenticate to
    your VMs. It _may_ be a good idea, if you are runnig this on a permanent
    "admin" VM, to add this to your `~/.profile` as well:  
    ```bash
    eval `ssh-agent`
    ssh-add ~/.ssh/id_rsa
    ```
-2. Find your Proxmox API URL. It should look something like
+1. Find your Proxmox API URL. It should look something like
    `https://192.168.0.25:8006/api2/json`. Once you found it, set the
    values to the env vars: `PM_API_URL`, `PM_API_TOKEN_ID` and
    `PM_API_TOKEN_SECRET`.  
     It might be a good idea to put this in your shell's `.profile`, too.
-3. Run `terraform init`  
+1. Run `terraform init`  
    This will download the required dependencies, such as this module.
-5. Run `terraform plan`
-6. Review the plan. Make sure it is doing what you expect! The defaults in
+1. Run `terraform plan`
+1. Review the plan. Make sure it is doing what you expect! The defaults in
    the example might be too large, and you might want to adjust IP
    addresses. _Now_ is the time to adjust `terraform.tfvars` to accomodate
    any changes you want to make.
-6. Run `terraform apply`.  
+1. Run `terraform apply`.  
    If all is as expected, then enter `yes` in the
    prompt and wait for your cluster to spin up.
-7. If all went well, you can run `./config.sh <cluster name> <user name>`
+1. If all went well, you can run `./config.sh <cluster name> <user name>`
    and it will output the `kubectl` commands you can use to create
    the context to connect to this cluster on any platform that runs
    `kubectl`.
