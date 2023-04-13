@@ -1,23 +1,22 @@
 # terraform-proxmox-k3s
 
-A module for spinning up an expandable and flexible K3s server for your HomeLab.
+A module for spinning up an expandable and flexible K3s server for a lab.
 
 ## Features
 
-- Fully automated. No need to remote into a VM; even for a kubeconfig
+- Fully automated. No need to remote into VMs.
 - Built in and automatically configured external loadbalancer (both K3s API and ingress)
 - Static(ish) MAC addresses for reproducible DHCP reservations
 - Node pools to easily scale and to handle many kinds of workloads
 - Pure Terraform - no Ansible needed.
-- Support for a private Docker registry (requires changes on each node, performed by this module)
+- Support for a private Docker registry (performs local changes on each node)
 
 ## Prerequisites
 
 - A Proxmox node with sufficient capacity for all nodes
 - A cloneable or template VM with a size that does not exceed the smallest node size (10G
-  currently) that supports Cloud-init and is based on Debian (ideally Ubuntu server)
-- An IP address range for master and worker nodes NOT handed out by DHCP (nodes are
-  configured with static IPs from this ranges, configured as offsets)
+  currently) that supports cloud-init and is based on Debian (ideally Ubuntu Server LTS)
+- Static IP address ranges for nodes excluded from DHCP
 - SSH agent configured for a private key to authenticate to K3s nodes
 
 ## Usage
