@@ -1,6 +1,6 @@
 # Proxmox/K3s Example
 
-This is an example project for setting up your own K3s cluster at home.
+This is an example project for setting up a K3s cluster on VMs in Proxmox.
 
 ## Requirements
 
@@ -26,42 +26,42 @@ This will spin up:
 - The worker VMs in pool `large` will be spun up on `10.10.10.100` ...
   `10.10.10.101`
 
-
-*Note:* To eliminate potential IP clashing with existing computers on your
-network, it is **STRONGLY** recommended that you take the IP ranges out of
-your DHCP server's rotation. Otherwise other computers in your network may
-already be using these IPs and that will create conflicts!
-
-Check your router's manual or google it for a step-by-step guide.
+*Note:* To avoid conflicts with other computers on your network, make soure to
+exclude these IP ranges in your DHCP server.
 
 ## Usage
 
-To run this example, make sure you `cd` to this directory in your terminal,
-then
+To run this example, copy the content of the `example` directory to its new,
+permanent home that will also keep Terraform state files for the lifetime of
+your cluster. Like with all Terraform projects, make sure you keep this
+permanently.
+
 1. Copy your public key to the `authorized_keys` variable in `terraform.tfvars`.
    In most cases, you should be able to get this key by running 
-   `cat ~/.ssh/id_rsa.pub > authorized_keys`.
+   `cat ~/.ssh/id_rsa.pub`.
 2. Make sure SSH agent is running so that the key can be used to authenticate to
-   your VMs:  
+   your VMs. It _may_ be a good idea, if you are runnig this on a permanent
+   "admin" VM, to add this to your `~/.profile` as well:  
    ```bash
    eval `ssh-agent`
    ssh-add ~/.ssh/id_rsa
    ```
-2. Find your Proxmox API. It should look something like
+2. Find your Proxmox API URL. It should look something like
    `https://192.168.0.25:8006/api2/json`. Once you found it, set the
    values to the env vars: `PM_API_URL`, `PM_API_TOKEN_ID` and
-   `PM_API_TOKEN_SECRET`. It might be a good idea to put this in your shell's
-   `.profile`, actually.
-3. Run `terraform init` (only needs to be done the first time)
-4. Run `terraform apply`
-5. Review the plan. Make sure it is doing what you expect! The defaults in
+   `PM_API_TOKEN_SECRET`.  
+    It might be a good idea to put this in your shell's `.profile`, too.
+3. Run `terraform init`  
+   This will download the required dependencies, such as this module.
+5. Run `terraform plan`
+6. Review the plan. Make sure it is doing what you expect! The defaults in
    the example might be too large, and you might want to adjust IP
-   addresses. Now is the time to adjust `terraform.tfvars` to accomodate.
-6. Run `terraform apply` again. If all is as expected, then enter `yes` in the
+   addresses. _Now_ is the time to adjust `terraform.tfvars` to accomodate
+   any changes you want to make.
+6. Run `terraform apply`.  
+   If all is as expected, then enter `yes` in the
    prompt and wait for your cluster to spin up.
-7. Retrieve your kubecontext by running
-   `config.sh my-cluster-name my-cluster-user`. Replace `my-cluster-name`
-   and `my-cluster-user` with desired (arbitrary) names. These are used
-   by `kubectl`, `k9s` and other Kubernetes tools to refer to this context.
-8. Take the output, and run it on any system you want to use Kubernetes
-   tools to access this cluster.
+7. If all went well, you can run `./config.sh <cluster name> <user name>`
+   and it will output the `kubectl` commands you can use to create
+   the context to connect to this cluster on any platform that runs
+   `kubectl`.
