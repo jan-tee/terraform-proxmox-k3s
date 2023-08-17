@@ -25,6 +25,7 @@ resource "proxmox_vm_qemu" "k3s-master" {
   name        = "${var.cluster_name}-master-${count.index}"
   clone       = coalesce(var.master_node_settings.image_id, var.default_node_settings.image_id)
   full_clone  = coalesce(var.master_node_settings.full_clone, var.default_node_settings.full_clone)
+  onboot      = coalesce(var.master_node_settings.onboot, var.default_node_settings.onboot, false)
   pool        = coalesce(var.master_node_settings.target_pool, var.default_node_settings.target_pool)
   cores       = coalesce(var.master_node_settings.cores, var.default_node_settings.cores)
   sockets     = coalesce(var.master_node_settings.sockets, var.default_node_settings.sockets)

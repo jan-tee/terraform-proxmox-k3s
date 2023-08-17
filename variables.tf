@@ -25,7 +25,8 @@ variable "default_node_settings" {
     target_node     = optional(string),
     target_pool     = string,
     authorized_keys = string
-    ciuser          = string
+    ciuser          = string,
+    onboot          = optional(bool)
   })
 }
 
@@ -52,7 +53,8 @@ variable "support_node_settings" {
     storage_id      = optional(string),
     target_node     = optional(string),
     target_pool     = optional(string),
-    ciuser          = optional(string)
+    ciuser          = optional(string),
+    onboot          = optional(bool)
   })
 }
 
@@ -84,6 +86,7 @@ variable "master_node_settings" {
     target_node     = optional(string),
     target_pool     = optional(string),
     ciuser          = optional(string),
+    onboot          = optional(bool),
     node_labels     = optional(list(string))
   })
 }
@@ -114,6 +117,7 @@ variable "node_pools" {
     target_node     = optional(string),
     target_pool     = optional(string),
     ciuser          = optional(string),
+    onboot          = optional(bool),
     node_labels     = optional(list(string))
   }))
 }

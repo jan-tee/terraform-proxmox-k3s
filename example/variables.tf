@@ -20,6 +20,7 @@ variable "default_node_settings" {
     target_pool     = string,
     authorized_keys = string,
     ciuser          = string,
+    onboot          = optional(bool)
   })
 }
 
@@ -34,7 +35,8 @@ variable "node_pools" {
     cores     = optional(number),
     sockets   = optional(number),
     disk_size = optional(string),
-    node_labels = optional(list(string))
+    onboot    = optional(bool),
+    node_labels = optional(list(string))    
   }))
   description = "The definition of node pools to create"
 }
@@ -49,7 +51,8 @@ variable "master_node_settings" {
     cores     = optional(number),
     sockets   = optional(number),
     disk_size = optional(string),
-    node_labels = optional(list(string))
+    node_labels = optional(list(string)),
+    onboot    = optional(bool)
   })
   description = "The definition of master nodes"
 }
@@ -62,7 +65,8 @@ variable "support_node_settings" {
     memory    = optional(number),
     cores     = optional(number),
     sockets   = optional(number),
-    disk_size = optional(string)
+    disk_size = optional(string),
+    onboot    = optional(bool)
   })
   description = "The definition of support node settings"
 }

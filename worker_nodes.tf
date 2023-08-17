@@ -45,6 +45,7 @@ resource "proxmox_vm_qemu" "k3s-worker" {
   name        = "${var.cluster_name}-${each.key}"
   clone       = coalesce(each.value.image_id, var.default_node_settings.image_id)
   full_clone  = coalesce(each.value.full_clone, var.default_node_settings.full_clone)
+  onboot      = coalesce(each.value.onboot, var.default_node_settings.onboot, false)
   pool        = coalesce(each.value.target_pool, var.default_node_settings.target_pool)
   cores       = coalesce(each.value.cores, var.default_node_settings.cores)
   sockets     = coalesce(each.value.sockets, var.default_node_settings.sockets)
