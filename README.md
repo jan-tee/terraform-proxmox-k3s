@@ -1,51 +1,47 @@
 # terraform-proxmox-k3s
 
 A module for spinning up an expandable and flexible K3s server for a lab.
+Uses `bpg/terraform-provider-proxmox` (historically used the
+`Telmate/terraform-provider-proxmox`, but experience with that has been
+truly horrible, full of regressions over time).
 
 ## Features
 
-- Fully automated. No need to remote into VMs.
+- Fully automated. No need to remote into VMs to set up k3s.
 - Built in and automatically configured external loadbalancer (both K3s API and ingress)
-- Static(ish) MAC addresses for reproducible DHCP reservations
 - Node pools to easily scale and to handle many kinds of workloads
 - Pure Terraform - no Ansible needed.
 - Support for a private Docker registry (performs local changes on each node)
 
 ## Prerequisites
 
-- A Proxmox node with sufficient capacity for all nodes
+- Proxmox node(s) with sufficient capacity for all nodes
+- SSH agent level trust for a user `terraform` on all Proxmox nodes.
 - A cloneable or template VM with a size that does not exceed the smallest node size (10G
   currently) that supports cloud-init and is based on Debian (ideally Ubuntu Server LTS)
 - Static IP address ranges for nodes excluded from DHCP
 - SSH agent configured for a private key to authenticate to K3s nodes
 
+### Set up the SSH user on PVE nodes
+
+1. In accordance with the reasons set out
+   [here](https://github.com/bpg/terraform-provider-proxmox/blob/main/docs/index.md),
+   make sure to create a SSH user for this Terraform project to use on the
+   Proxmox server. There are ways around this, but it is much more
+   comfortable to set it up this way:
+   ```bash
+   sudo useradd -m terraform
+   cat > /etc/sudoers.d/terraform <<EOM
+   terraform ALL=(root) NOPASSWD: /sbin/pvesm
+   terraform ALL=(root) NOPASSWD: /sbin/qm
+   terraform ALL=(root) NOPASSWD: /usr/bin/tee /var/lib/vz/*
+   EOM```
+2. Add you SSH key to the `authorized_keys` of the `terraform` user on PVE.
+3. Make this SSH key available via `ssh-agent`.
+
 ## Usage
 
-> Take a look at the complete auto-generated docs on the
-[Official Registry Page](https://registry.terraform.io/modules/fvumbaca/k3s/proxmox/latest).
-
-1. Set environment variables to access Proxmox VE:
-   ```sh
-   export PM_API_URL="https://your.proxmox.server:8006/api2/json"
-   export PM_API_TOKEN_ID="<proxmox token ID>"
-   export PM_API_TOKEN_SECRET="<proxmox token secret>"
-   ```
-1. Set up SSH trust (see [example](example))
-1. Set up Terraform vars in `terraform.tfvars`.  
-   Use the file from [example/](example/terraform.tfvars.sampe) as a starter.
-1. Set up a `main.tf` to use the module. Edit as needed (for cluster size, node pool configuration).  
-   Use the file from [example/](example/main.tf) as a starter.
-1. Run `terraform plan`, `terraform apply`.
-1. Retrieve the `kubeconfig` file from the terraform outputs:  
-  ```sh
-  terraform output -raw kubeconfig > config.yaml
-  # Test out the config:
-  kubectl --kubeconfig config.yaml get nodes
-  ```
-  or use the script provided in [example/config.sh](example/config.sh) to more easily
-  export `kubectl` config.
-
-> Make sure your support node is routable from the computer you are running the command on!
+See the [example ](example/) for details.
 
 ## Runbooks and Documents
 

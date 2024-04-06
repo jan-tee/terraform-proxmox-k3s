@@ -14,6 +14,7 @@ locals {
         {
           subnet = coalesce(pool.subnet, var.default_node_settings.subnet),
           node_labels = coalesce(pool.node_labels, [])
+          vm_id = pool.vm_id + i
         })
     ]
   ])
@@ -22,75 +23,88 @@ locals {
     for node in local.listed_worker_nodes : "${node.name}-${node.i}" =>
     merge(node, {
       ip      = cidrhost(node.subnet, node.i + node.ip_offset)
-      ciuser  = coalesce(node.ciuser, var.default_node_settings.ciuser)
       gw      = coalesce(node.gw, var.default_node_settings.gw)
-      authorized_keys = coalesce(node.authorized_keys, var.default_node_settings.authorized_keys)
-      searchdomain= coalesce(node.searchdomain, var.default_node_settings.searchdomain)
+      vm_id   = node.vm_id
     })
   }
 
   worker_node_ips = [for node in local.mapped_worker_nodes : node.ip]
 }
 
-resource "proxmox_vm_qemu" "k3s-worker" {
+resource "proxmox_virtual_environment_vm" "k3s-worker" {
   depends_on = [
-    proxmox_vm_qemu.k3s-support,
-    proxmox_vm_qemu.k3s-master,
+    proxmox_virtual_environment_vm.k3s-support,
+    proxmox_virtual_environment_vm.k3s-master,
   ]
 
   for_each = local.mapped_worker_nodes
 
-  #
-  target_node = coalesce(each.value.target_node, var.default_node_settings.target_node)
-  name        = "${var.cluster_name}-${each.key}"
-  clone       = coalesce(each.value.image_id, var.default_node_settings.image_id)
-  full_clone  = coalesce(each.value.full_clone, var.default_node_settings.full_clone)
-  onboot      = coalesce(each.value.onboot, var.default_node_settings.onboot, false)
-  pool        = coalesce(each.value.target_pool, var.default_node_settings.target_pool)
-  cores       = coalesce(each.value.cores, var.default_node_settings.cores)
-  sockets     = coalesce(each.value.sockets, var.default_node_settings.sockets)
-  memory      = coalesce(each.value.memory, var.default_node_settings.memory)
-  ciuser      = each.value.ciuser
-  searchdomain= each.value.searchdomain
-  ipconfig0   = "ip=${each.value.ip}/${split("/", each.value.subnet)[1]},gw=${each.value.gw}"
-  sshkeys     = each.value.authorized_keys
-  nameserver  = coalesce(each.value.nameserver, var.default_node_settings.nameserver)
-  os_type     = "cloud-init"
-  agent       = 1
+  node_name   = coalesce(each.value.node, var.default_node_settings.node)
+  name        = "${var.cluster.name}-${each.key}"
+  vm_id       = each.value.vm_id
 
-  disk {
-    type    = coalesce(each.value.disk_type, var.default_node_settings.disk_type)
-    storage = coalesce(each.value.storage_id, var.default_node_settings.storage_id)
-    size    = coalesce(each.value.disk_size, var.default_node_settings.disk_size)
+
+  on_boot     = coalesce(each.value.onboot, var.default_node_settings.onboot, false)
+  cpu {
+    cores     = coalesce(each.value.cores, var.default_node_settings.cores)
+    sockets   = coalesce(each.value.sockets, var.default_node_settings.sockets)
+    type      = "x86-64-v2-AES"
   }
 
-  network {
-    bridge    = coalesce(each.value.network_bridge, var.default_node_settings.network_bridge)
-    firewall  = coalesce(each.value.firewall, var.default_node_settings.firewall)
-    link_down = false
-    macaddr   = upper(macaddress.k3s-workers[each.key].address)
-    model     = "virtio"
-    queues    = 0
-    rate      = 0
-    tag       = coalesce(each.value.network_tag, var.default_node_settings.network_tag)
+  memory {
+    dedicated = coalesce(each.value.memory, var.default_node_settings.memory)
+  }
+
+  initialization {
+    datastore_id = var.cluster.cloud_config_datastore_id
+    ip_config {
+      ipv4 {
+        address = "${each.value.ip}/${split("/", each.value.subnet)[1]}"
+        gateway = "${each.value.gw}"
+      }
+    }
+    dns {
+      domain = var.default_node_settings.searchdomain
+      servers = [var.default_node_settings.nameserver]
+    }
+    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+  }
+
+  disk {
+    datastore_id = coalesce(each.value.storage_id, var.default_node_settings.storage_id)
+    file_id      = local.cloud_image.id
+    interface    = "virtio0"
+    iothread     = true
+    discard      = "on"
+    size         = coalesce(var.master_node_settings.disk_size, var.default_node_settings.disk_size)
+  }
+
+  network_device {
+    bridge       = coalesce(each.value.network_bridge, var.default_node_settings.network_bridge)
+    mac_address  = macaddress.k3s-workers[each.key].address
+    vlan_id      = null # TODO coalesce(var.master_node_settings.network_tag, var.default_node_settings.network_tag, null)
+  }
+
+  agent {
+    enabled = true
   }
 
   lifecycle {
     ignore_changes = [
-      ciuser,
-      sshkeys,
-      disk,
-      network,
-      desc,
-      searchdomain,
-      bootdisk
+      initialization[0].datastore_id,
+      initialization[0].interface,
+      network_device[0].disconnected,
+      disk[1].file_format,
+      disk[1].path_in_datastore,
+      tags,
+      mac_addresses,
+      cpu[0].flags
     ]
   }
 
-
   connection {
     type = "ssh"
-    user = each.value.ciuser
+    user = "terraform"
     host = each.value.ip
   }
 
@@ -104,10 +118,11 @@ resource "proxmox_vm_qemu" "k3s-worker" {
         server_hosts        = ["https://${local.support_node_ip}:6443"]
         node_taints         = coalesce(each.value.taints, [])
         node_labels         = coalesce(each.value.node_labels, [])
-        insecure_registries = var.insecure_registries
+        insecure_registries = var.cluster.insecure_registries
         datastores          = []
-        http_proxy          = var.http_proxy
+        http_proxy          = var.cluster.http_proxy
       })
     ]
   }
+
 }

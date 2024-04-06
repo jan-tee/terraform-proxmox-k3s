@@ -8,9 +8,9 @@ locals {
 
 resource "null_resource" "k3s-reboot-task" {
   depends_on = [
-    proxmox_vm_qemu.k3s-support,
-    proxmox_vm_qemu.k3s-master,
-    proxmox_vm_qemu.k3s-worker,
+    proxmox_virtual_environment_vm.k3s-support,
+    proxmox_virtual_environment_vm.k3s-master,
+    proxmox_virtual_environment_vm.k3s-worker,
     data.external.kubeconfig
   ]
 

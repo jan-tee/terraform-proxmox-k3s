@@ -1,62 +1,72 @@
-resource "macaddress" "k3s-support" {}
+resource "macaddress" "k3s-support" {
+}
 
 locals {
   support_node_subnet    = coalesce(var.support_node_settings.subnet, var.default_node_settings.subnet)
   support_node_ip        = cidrhost(local.support_node_subnet, var.support_node_settings.ip_offset)
   gw                     = coalesce(var.support_node_settings.gw, var.default_node_settings.gw)
-  support_node_ciuser    = coalesce(var.support_node_settings.ciuser, var.default_node_settings.ciuser)
 }
 
-resource "proxmox_vm_qemu" "k3s-support" {
-  target_node = coalesce(var.support_node_settings.target_node, var.default_node_settings.target_node)
-  name        = join("-", [var.cluster_name, "support"])
-  clone       = coalesce(var.support_node_settings.image_id, var.default_node_settings.image_id)
-  full_clone  = coalesce(var.support_node_settings.full_clone, var.default_node_settings.full_clone)
-  onboot      = coalesce(var.support_node_settings.onboot, var.default_node_settings.onboot, false)
-  pool        = coalesce(var.support_node_settings.target_pool, var.default_node_settings.target_pool)
-  cores       = coalesce(var.support_node_settings.cores, var.default_node_settings.cores)
-  sockets     = coalesce(var.support_node_settings.sockets, var.default_node_settings.sockets)
-  memory      = coalesce(var.support_node_settings.memory, var.default_node_settings.memory)
-  ciuser      = local.support_node_ciuser
-  searchdomain= coalesce(var.support_node_settings.searchdomain, var.default_node_settings.searchdomain)
-  ipconfig0   = "ip=${local.support_node_ip}/${split("/", local.support_node_subnet)[1]},gw=${local.gw}"
-  sshkeys     = coalesce(var.support_node_settings.authorized_keys, var.default_node_settings.authorized_keys)
-  nameserver  = coalesce(var.support_node_settings.nameserver, var.default_node_settings.nameserver)
-  os_type     = "cloud-init"
-  agent       = 1
+resource "proxmox_virtual_environment_vm" "k3s-support" {
+  node_name   = coalesce(var.support_node_settings.node, var.default_node_settings.node)
+  name        = join("-", [var.cluster.name, "support"])
+  vm_id       = var.support_node_settings.vm_id
 
-  disk {
-    type    = coalesce(var.support_node_settings.disk_type, var.default_node_settings.disk_type)
-    storage = coalesce(var.support_node_settings.storage_id, var.default_node_settings.storage_id)
-    size    = coalesce(var.support_node_settings.disk_size, var.default_node_settings.disk_size)
+  on_boot     = coalesce(var.support_node_settings.onboot, var.default_node_settings.onboot, false)
+  cpu {
+    cores     = coalesce(var.support_node_settings.cores, var.default_node_settings.cores)
+    sockets   = coalesce(var.support_node_settings.sockets, var.default_node_settings.sockets)
+    type      = "x86-64-v2-AES"
   }
 
-  network {
-    bridge    = coalesce(var.support_node_settings.network_bridge, var.default_node_settings.network_bridge)
-    firewall  = coalesce(var.support_node_settings.firewall, var.default_node_settings.firewall)
-    link_down = false
-    macaddr   = upper(macaddress.k3s-support.address)
-    model     = "virtio"
-    queues    = 0
-    rate      = 0
-    tag       = coalesce(var.support_node_settings.network_tag, var.default_node_settings.network_tag)
+  memory {
+    dedicated = coalesce(var.support_node_settings.memory, var.default_node_settings.memory)
+  }
+
+  initialization {
+    datastore_id = var.cluster.cloud_config_datastore_id
+    ip_config {
+      ipv4 {
+        address = "${local.support_node_ip}/${split("/", local.support_node_subnet)[1]}"
+        gateway = "${local.gw}"
+      }
+    }
+    dns {
+      domain = var.default_node_settings.searchdomain
+      servers = [var.default_node_settings.nameserver]
+    }
+    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+  }
+
+  disk {
+    datastore_id = coalesce(var.support_node_settings.storage_id, var.default_node_settings.storage_id)
+    file_id      = local.cloud_image.id
+    interface    = "virtio0"
+    iothread     = true
+    discard      = "on"
+    size         = coalesce(var.support_node_settings.disk_size, var.default_node_settings.disk_size)
+  }
+
+  network_device {
+    bridge       = coalesce(var.support_node_settings.network_bridge, var.default_node_settings.network_bridge)
+    mac_address  = upper(macaddress.k3s-support.address)
+    vlan_id      = null # TODO coalesce(var.support_node_settings.network_tag, var.default_node_settings.network_tag, null)
+  }
+
+  agent {
+    enabled = true
   }
 
   lifecycle {
     ignore_changes = [
-      ciuser,
-      sshkeys,
-      disk,
-      network,
-      desc,
-      searchdomain,
-      bootdisk
+      initialization[0].datastore_id,
+      initialization[0].interface,
     ]
   }
 
   connection {
     type = "ssh"
-    user = local.support_node_ciuser
+    user = "terraform"
     host = local.support_node_ip
   }
 
@@ -69,11 +79,15 @@ resource "proxmox_vm_qemu" "k3s-support" {
         k3s_user     = var.support_node_settings.db_user
         k3s_password = random_password.k3s-master-db-password.result
 
-        http_proxy = var.http_proxy
+        http_proxy = var.cluster.http_proxy
       })
     ]
   }
 }
+
+# output "vm_ipv4_address" {
+#   value = proxmox_virtual_environment_vm.k3s-support.ipv4_addresses[1][0]
+# }
 
 resource "random_password" "support-db-password" {
   length           = 16
@@ -89,7 +103,7 @@ resource "random_password" "k3s-master-db-password" {
 
 resource "null_resource" "k3s_nginx_config" {
   depends_on = [
-    proxmox_vm_qemu.k3s-support
+    proxmox_virtual_environment_vm.k3s-support
   ]
 
   triggers = {
@@ -98,7 +112,7 @@ resource "null_resource" "k3s_nginx_config" {
 
   connection {
     type = "ssh"
-    user = local.support_node_ciuser
+    user = "terraform"
     host = local.support_node_ip
   }
 

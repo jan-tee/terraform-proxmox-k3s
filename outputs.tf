@@ -1,4 +1,3 @@
-
 output "k3s_db_password" {
   value     = random_password.k3s-master-db-password.result
   sensitive = true

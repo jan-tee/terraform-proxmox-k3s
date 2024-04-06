@@ -1,92 +1,92 @@
-variable "cluster_name" {
-  default     = "k3s"
-  type        = string
-  description = "Name of the cluster used for prefixing cluster components (ie nodes)."
+variable "proxmox" {
+ type = object({
+   endpoint                = string,
+   api_token               = string
+ })
+}
+
+variable "image" {
+  type = object({
+    download_type          = optional(string, "local"),
+    path                   = optional(string, "http://boot.at.home/cloudimages/jammy-server-cloudimg-amd64.img")
+    datastore_id           = optional(string, "iso")
+  })
+}
+
+variable "cluster" {
+  type = object({
+    name                      = string,
+    target_node               = string,
+    master_nodes_count        = number,
+    api_hostnames             = optional(list(string), []),
+    k3s_disable_components    = optional(list(string), []),
+    http_proxy                = optional(string, ""),
+    insecure_registries       = optional(list(string), []),
+    ssh_key_path              = optional(string),
+    cloud_config_datastore_id = optional(string, "local")
+  })
 }
 
 variable "default_node_settings" {
   type = object({
+    vm_id           = optional(number),
     cores           = optional(number, 2),
     sockets         = optional(number, 1),
-    disk_type       = optional(string, "scsi"),
     storage_id      = string,
-    disk_size       = optional(string, "10G"),
-    firewall        = optional(bool, true),
-    image_id        = string,
-    full_clone      = bool,
     memory          = number,
-    target_pool     = optional(string, "local-lvm")
+    disk_size       = number,
     nameserver      = string,
     searchdomain    = string
     network_bridge  = optional(string, "vmbr0"),
-    network_tag     = optional(number, -1),
+    network_tag     = optional(number),
     subnet          = string,
     gw              = string,
-    target_node     = optional(string),
-    target_pool     = string,
-    authorized_keys = string
-    ciuser          = string,
-    onboot          = optional(bool)
+    node     = optional(string),
+    pool     = optional(string, "local-lvm")
+    onboot          = optional(bool),
+    boot            = optional(string, "order=virtio0")
   })
 }
 
 variable "support_node_settings" {
   type = object({
-    authorized_keys = optional(string),
+    vm_id           = optional(number),
     cores           = optional(number),
     db_name         = optional(string, "k3s"),
     db_user         = optional(string, "k3s"),
-    disk_size       = optional(string),
-    disk_type       = optional(string),
-    firewall        = optional(bool),
-    full_clone      = optional(bool),
     gw              = optional(string),
-    image_id        = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),
     memory          = optional(number),
-    nameserver      = optional(string),
+    disk_size       = optional(number),
     network_bridge  = optional(string),
     network_tag     = optional(number),
-    searchdomain    = optional(string),
     sockets         = optional(number),
     storage_id      = optional(string),
-    target_node     = optional(string),
-    target_pool     = optional(string),
-    ciuser          = optional(string),
-    onboot          = optional(bool)
+    node     = optional(string),
+    pool     = optional(string),
+    onboot          = optional(bool),
+    boot            = optional(string)
   })
-}
-
-variable "master_nodes_count" {
-  description = "Number of master nodes."
-  default     = 2
-  type        = number
 }
 
 variable "master_node_settings" {
   type = object({
-    authorized_keys = optional(string),
+    vm_id           = optional(number),
     cores           = optional(number),
-    disk_size       = optional(string),
-    disk_type       = optional(string),
-    firewall        = optional(bool),
-    full_clone      = optional(bool),
     gw              = optional(string),
-    image_id        = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),
     memory          = optional(number),
-    nameserver      = optional(string),
+    disk_size       = optional(number),
     network_bridge  = optional(string),
     network_tag     = optional(number),
-    searchdomain    = optional(string),
     sockets         = optional(number),
     storage_id      = optional(string),
-    target_node     = optional(string),
-    target_pool     = optional(string),
-    ciuser          = optional(string),
+    node     = optional(string),
+    pool     = optional(string),
     onboot          = optional(bool),
+    boot            = optional(string),
     node_labels     = optional(list(string))
   })
 }
@@ -96,52 +96,23 @@ variable "node_pools" {
   type = list(object({
     name            = string,
     size            = number,
+    vm_id           = optional(number),
     taints          = optional(list(string)),
-    authorized_keys = optional(string),
     cores           = optional(number),
-    disk_size       = optional(string),
-    disk_type       = optional(string),
-    firewall        = optional(bool),
-    full_clone      = optional(bool),
     gw              = optional(string),
-    image_id        = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),
     memory          = optional(number),
-    nameserver      = optional(string),
+    disk_size       = optional(number),
     network_bridge  = optional(string),
     network_tag     = optional(number),
-    searchdomain    = optional(string),
     sockets         = optional(number),
     storage_id      = optional(string),
-    target_node     = optional(string),
-    target_pool     = optional(string),
-    ciuser          = optional(string),
+    node     = optional(string),
+    pool     = optional(string),
     onboot          = optional(bool),
+    boot            = optional(string),
     node_labels     = optional(list(string))
   }))
 }
 
-variable "api_hostnames" {
-  description = "Alternative hostnames for the API server."
-  type        = list(string)
-  default     = []
-}
-
-variable "k3s_disable_components" {
-  description = "List of components to disable. Ref: https://rancher.com/docs/k3s/latest/en/installation/install-options/server-config/#kubernetes-components"
-  type        = list(string)
-  default     = []
-}
-
-variable "http_proxy" {
-  default     = ""
-  type        = string
-  description = "http_proxy"
-}
-
-variable "insecure_registries" {
-  type        = list(string)
-  description = "FQDNs of 'insecure' (private, untrusted CA signed cert, or plaintext HTTP) Docker registries that should be accessible to k3s"
-  default     = []
-}

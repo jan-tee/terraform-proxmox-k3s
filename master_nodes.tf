@@ -1,11 +1,10 @@
 resource "macaddress" "k3s-masters" {
-  count = var.master_nodes_count
+  count = var.cluster.master_nodes_count
 }
 
 locals {
   master_node_subnet = coalesce(var.master_node_settings.subnet, var.default_node_settings.subnet)
-  master_node_ips    = [for i in range(var.master_nodes_count) : cidrhost(local.master_node_subnet, i + var.master_node_settings.ip_offset)]
-  master_node_ciuser = coalesce(var.master_node_settings.ciuser, var.default_node_settings.ciuser)
+  master_node_ips    = [for i in range(var.cluster.master_nodes_count) : cidrhost(local.master_node_subnet, i + var.master_node_settings.ip_offset)]
 }
 
 resource "random_password" "k3s-server-token" {
@@ -14,62 +13,83 @@ resource "random_password" "k3s-server-token" {
   override_special = "_%@"
 }
 
-resource "proxmox_vm_qemu" "k3s-master" {
+data "external" "kubeconfig" {
   depends_on = [
-    proxmox_vm_qemu.k3s-support,
+    proxmox_virtual_environment_vm.k3s-support,
+#   proxmox_virtual_environment_vm.k3s-master
   ]
 
-  count = var.master_nodes_count
+  program = [
+    "/usr/bin/ssh",
+    "-o UserKnownHostsFile=/dev/null",
+    "-o StrictHostKeyChecking=no",
+    "terraform@${local.master_node_ips[0]}",
+    "echo '{\"kubeconfig\":\"'$(sudo cat /etc/rancher/k3s/k3s.yaml | base64)'\"}'"
+  ]
+}
 
-  target_node = coalesce(var.master_node_settings.target_node, var.default_node_settings.target_node)
-  name        = "${var.cluster_name}-master-${count.index}"
-  clone       = coalesce(var.master_node_settings.image_id, var.default_node_settings.image_id)
-  full_clone  = coalesce(var.master_node_settings.full_clone, var.default_node_settings.full_clone)
-  onboot      = coalesce(var.master_node_settings.onboot, var.default_node_settings.onboot, false)
-  pool        = coalesce(var.master_node_settings.target_pool, var.default_node_settings.target_pool)
-  cores       = coalesce(var.master_node_settings.cores, var.default_node_settings.cores)
-  sockets     = coalesce(var.master_node_settings.sockets, var.default_node_settings.sockets)
-  memory      = coalesce(var.master_node_settings.memory, var.default_node_settings.memory)
-  ciuser      = local.master_node_ciuser
-  searchdomain= coalesce(var.master_node_settings.searchdomain, var.default_node_settings.searchdomain)
-  ipconfig0   = "ip=${local.master_node_ips[count.index]}/${split("/", local.master_node_subnet)[1]},gw=${local.gw}"
-  sshkeys     = coalesce(var.master_node_settings.authorized_keys, var.default_node_settings.authorized_keys)
-  nameserver  = coalesce(var.master_node_settings.nameserver, var.default_node_settings.nameserver)
-  os_type     = "cloud-init"
-  agent       = 1
+resource "proxmox_virtual_environment_vm" "k3s-master" {
+  count       = var.cluster.master_nodes_count
 
-  disk {
-    type    = coalesce(var.master_node_settings.disk_type, var.default_node_settings.disk_type)
-    storage = coalesce(var.master_node_settings.storage_id, var.default_node_settings.storage_id)
-    size    = coalesce(var.master_node_settings.disk_size, var.default_node_settings.disk_size)
+  node_name   = coalesce(var.master_node_settings.node, var.default_node_settings.node)
+  name        = "${var.cluster.name}-master-${count.index}"
+  vm_id       = var.master_node_settings.vm_id + count.index
+
+  on_boot     = coalesce(var.master_node_settings.onboot, var.default_node_settings.onboot, false)
+  cpu {
+    cores     = coalesce(var.master_node_settings.cores, var.default_node_settings.cores)
+    sockets   = coalesce(var.master_node_settings.sockets, var.default_node_settings.sockets)
+    type      = "x86-64-v2-AES"
   }
 
-  network {
-    bridge    = coalesce(var.master_node_settings.network_bridge, var.default_node_settings.network_bridge)
-    firewall  = coalesce(var.master_node_settings.firewall, var.default_node_settings.firewall)
-    link_down = false
-    macaddr   = upper(macaddress.k3s-masters[count.index].address)
-    model     = "virtio"
-    queues    = 0
-    rate      = 0
-    tag       = coalesce(var.master_node_settings.network_tag, var.default_node_settings.network_tag)
+  memory {
+    dedicated = coalesce(var.master_node_settings.memory, var.default_node_settings.memory)
+  }
+
+  initialization {
+    datastore_id = var.cluster.cloud_config_datastore_id
+    ip_config {
+      ipv4 {
+        address = "${local.master_node_ips[count.index]}/${split("/", local.master_node_subnet)[1]}"
+        gateway = "${local.gw}"
+      }
+    }
+    dns {
+      domain = var.default_node_settings.searchdomain
+      servers = [var.default_node_settings.nameserver]
+    }
+    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+  }
+
+  disk {
+    datastore_id = coalesce(var.master_node_settings.storage_id, var.default_node_settings.storage_id)
+    file_id      = local.cloud_image.id
+    interface    = "virtio0"
+    iothread     = true
+    discard      = "on"
+    size         = coalesce(var.master_node_settings.disk_size, var.default_node_settings.disk_size)
+  }
+
+  network_device {
+    bridge       = coalesce(var.master_node_settings.network_bridge, var.default_node_settings.network_bridge)
+    mac_address  = upper(macaddress.k3s-masters[count.index].address)
+    vlan_id      = null # TODO coalesce(var.master_node_settings.network_tag, var.default_node_settings.network_tag, null)
+  }
+
+  agent {
+    enabled = true
   }
 
   lifecycle {
     ignore_changes = [
-      ciuser,
-      sshkeys,
-      disk,
-      network,
-      desc,
-      searchdomain,
-      bootdisk
+      initialization[0].datastore_id,
+      initialization[0].interface,
     ]
   }
 
   connection {
     type = "ssh"
-    user = local.master_node_ciuser
+    user = "terraform"
     host = local.master_node_ips[count.index]
   }
 
@@ -78,35 +98,20 @@ resource "proxmox_vm_qemu" "k3s-master" {
       templatefile("${path.module}/scripts/install-k3s-server.sh.tftpl", {
         mode                = "server"
         tokens              = [random_password.k3s-server-token.result]
-        alt_names           = concat([local.support_node_ip], var.api_hostnames)
+        alt_names           = concat([local.support_node_ip], var.cluster.api_hostnames)
         server_hosts        = []
         node_taints         = ["CriticalAddonsOnly=true:NoExecute"]
         node_labels         = coalesce(var.master_node_settings.node_labels, [])
-        insecure_registries = var.insecure_registries
-        disable             = var.k3s_disable_components
+        insecure_registries = var.cluster.insecure_registries
+        disable             = var.cluster.k3s_disable_components
         datastores = [{
           host     = "${local.support_node_ip}:3306"
           name     = var.support_node_settings.db_name
           user     = var.support_node_settings.db_user
           password = random_password.k3s-master-db-password.result
         }]
-        http_proxy = var.http_proxy
+        http_proxy = var.cluster.http_proxy
       })
     ]
   }
-}
-
-data "external" "kubeconfig" {
-  depends_on = [
-    proxmox_vm_qemu.k3s-support,
-    proxmox_vm_qemu.k3s-master
-  ]
-
-  program = [
-    "/usr/bin/ssh",
-    "-o UserKnownHostsFile=/dev/null",
-    "-o StrictHostKeyChecking=no",
-    "${local.master_node_ciuser}@${local.master_node_ips[0]}",
-    "echo '{\"kubeconfig\":\"'$(sudo cat /etc/rancher/k3s/k3s.yaml | base64)'\"}'"
-  ]
 }
