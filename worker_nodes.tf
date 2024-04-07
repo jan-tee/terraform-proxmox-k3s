@@ -30,7 +30,7 @@ users:
 timezone: Europe/Berlin
 
 hostname: "${each.key}"
-fqdn: "${var.cluster.name}-${each.key}.${coalesce(each.value.domain, var.default_node_settings.domain)}"
+fqdn: "${each.key}.${coalesce(each.value.domain, var.default_node_settings.domain)}"
 prefer_fqdn_over_hostname: true
 
 write_files:
