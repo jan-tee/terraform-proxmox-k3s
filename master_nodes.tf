@@ -2,16 +2,62 @@ resource "macaddress" "k3s-masters" {
   count = var.cluster.master_nodes_count
 }
 
-locals {
-  master_node_subnet = coalesce(var.master_node_settings.subnet, var.default_node_settings.subnet)
-  master_node_ips    = [for i in range(var.cluster.master_nodes_count) : cidrhost(local.master_node_subnet, i + var.master_node_settings.ip_offset)]
-}
-
 resource "random_password" "k3s-server-token" {
   length           = 32
   special          = false
   override_special = "_%@"
 }
+
+resource "random_id" "cloud-config-k3s-master" {
+  count = var.cluster.master_nodes_count
+  byte_length = 16
+}
+
+# cloud_config file
+resource "proxmox_virtual_environment_file" "cloud-config-k3s-master" {
+  count = var.cluster.master_nodes_count
+
+  content_type = "snippets"
+  datastore_id = var.cluster.cloud_config_datastore_id
+  node_name    = var.cluster.target_node
+
+  source_raw {
+    data = <<EOF
+#cloud-config
+users:
+  - default
+  - name: terraform
+    groups:
+      - sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${trimspace(data.local_file.ssh_public_key.content)}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+timezone: Europe/Berlin
+hostname: "${var.cluster.name}-master-${count.index}"
+fqdn: "${var.cluster.name}-master-${count.index}.${coalesce(var.master_node_settings.domain, var.default_node_settings.domain)}"
+write_files:
+  - encoding: b64
+    content: ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA0KIEBAQEBAQCAgIEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICAgQEBAQEBAICAgIEBAQEBAQCAgIEBAQEBAQEBAQEAgICBAQEBAQ
+    owner: root:root
+    path: /etc/motd
+    permissions: "0644"
+
+packages:
+  - qemu-guest-agent
+  - net-tools
+package_upgrade: true
+runcmd:
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  - apt update
+  - apt upgrade -y
+  - echo "done" > /tmp/cloud-config.done
+EOF
+    file_name = "cloud-config-${var.cluster.name}-master-${count.index}.${random_id.cloud-config-k3s-master[count.index].hex}.yaml"
+  }
+}
+
 
 data "external" "kubeconfig" {
   depends_on = [
@@ -58,7 +104,7 @@ resource "proxmox_virtual_environment_vm" "k3s-master" {
       domain = var.default_node_settings.searchdomain
       servers = [var.default_node_settings.nameserver]
     }
-    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+    user_data_file_id = proxmox_virtual_environment_file.cloud-config-k3s-master[count.index].id
   }
 
   disk {

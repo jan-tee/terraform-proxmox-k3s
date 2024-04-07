@@ -1,10 +1,51 @@
 resource "macaddress" "k3s-support" {
 }
 
-locals {
-  support_node_subnet    = coalesce(var.support_node_settings.subnet, var.default_node_settings.subnet)
-  support_node_ip        = cidrhost(local.support_node_subnet, var.support_node_settings.ip_offset)
-  gw                     = coalesce(var.support_node_settings.gw, var.default_node_settings.gw)
+resource "random_id" "cloud-config-k3s-support" {
+  byte_length = 16
+}
+
+# cloud_config file
+resource "proxmox_virtual_environment_file" "cloud-config-k3s-support" {
+  content_type = "snippets"
+  datastore_id = var.cluster.cloud_config_datastore_id
+  node_name    = var.cluster.target_node
+
+  source_raw {
+    data = <<EOF
+#cloud-config
+users:
+  - default
+  - name: terraform
+    groups:
+      - sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${trimspace(data.local_file.ssh_public_key.content)}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+timezone: Europe/Berlin
+hostname: "${join("-", [var.cluster.name, "support"])}"
+fqdn: "${join("-", [var.cluster.name, "support"])}.${coalesce(var.support_node_settings.domain, var.default_node_settings.domain)}"
+write_files:
+  - encoding: b64
+    content: ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA0KIEBAQEBAQCAgIEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICAgQEBAQEBAICAgIEBAQEBAQCAgIEBAQEBAQEBAQEAgICBAQEBAQ
+    owner: root:root
+    path: /etc/motd
+    permissions: "0644"
+
+packages:
+  - qemu-guest-agent
+  - net-tools
+package_upgrade: true
+runcmd:
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  - apt update
+  - apt upgrade -y
+  - echo "done" > /tmp/cloud-config.done
+EOF
+    file_name = "cloud-config-${join("-", [var.cluster.name, "support"])}-${random_id.cloud-config-k3s-support.hex}.yaml"
+  }
 }
 
 resource "proxmox_virtual_environment_vm" "k3s-support" {
@@ -35,7 +76,7 @@ resource "proxmox_virtual_environment_vm" "k3s-support" {
       domain = var.default_node_settings.searchdomain
       servers = [var.default_node_settings.nameserver]
     }
-    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+    user_data_file_id = proxmox_virtual_environment_file.cloud-config-k3s-support.id
   }
 
   disk {

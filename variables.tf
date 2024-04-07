@@ -36,7 +36,8 @@ variable "default_node_settings" {
     memory          = number,
     disk_size       = number,
     nameserver      = string,
-    searchdomain    = string
+    searchdomain    = string,
+    domain          = string,
     network_bridge  = optional(string, "vmbr0"),
     network_tag     = optional(number),
     subnet          = string,
@@ -54,6 +55,7 @@ variable "support_node_settings" {
     cores           = optional(number),
     db_name         = optional(string, "k3s"),
     db_user         = optional(string, "k3s"),
+    domain          = optional(string),
     gw              = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),
@@ -74,6 +76,7 @@ variable "master_node_settings" {
   type = object({
     vm_id           = optional(number),
     cores           = optional(number),
+    domain          = optional(string),
     gw              = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),
@@ -99,6 +102,7 @@ variable "node_pools" {
     vm_id           = optional(number),
     taints          = optional(list(string)),
     cores           = optional(number),
+    domain          = optional(string),
     gw              = optional(string),
     subnet          = optional(string),
     ip_offset       = optional(number),

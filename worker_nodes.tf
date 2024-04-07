@@ -2,33 +2,54 @@ resource "macaddress" "k3s-workers" {
   for_each = local.mapped_worker_nodes
 }
 
-locals {
-  listed_worker_nodes = flatten([
-    for pool in var.node_pools :
-    [
-      for i in range(pool.size) :
-      merge({
-          i = i
-        },
-          pool,
-        {
-          subnet = coalesce(pool.subnet, var.default_node_settings.subnet),
-          node_labels = coalesce(pool.node_labels, [])
-          vm_id = pool.vm_id + i
-        })
-    ]
-  ])
+resource "random_id" "cloud-config-k3s-worker" {
+  for_each = local.mapped_worker_nodes
+  byte_length = 16
+}
 
-  mapped_worker_nodes = {
-    for node in local.listed_worker_nodes : "${node.name}-${node.i}" =>
-    merge(node, {
-      ip      = cidrhost(node.subnet, node.i + node.ip_offset)
-      gw      = coalesce(node.gw, var.default_node_settings.gw)
-      vm_id   = node.vm_id
-    })
+# cloud_config file
+resource "proxmox_virtual_environment_file" "cloud-config-k3s-worker" {
+  for_each = local.mapped_worker_nodes
+
+  content_type = "snippets"
+  datastore_id = var.cluster.cloud_config_datastore_id
+  node_name    = var.cluster.target_node
+
+  source_raw {
+    data = <<EOF
+#cloud-config
+users:
+  - default
+  - name: terraform
+    groups:
+      - sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${trimspace(data.local_file.ssh_public_key.content)}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+timezone: Europe/Berlin
+hostname: "${each.key}"
+fqdn: "${var.cluster.name}-${each.key}.${coalesce(each.value.domain, var.default_node_settings.domain)}"
+write_files:
+  - encoding: b64
+    content: ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA0KIEBAQEBAQCAgIEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICAgQEBAQEBAICAgIEBAQEBAQCAgIEBAQEBAQEBAQEAgICBAQEBAQEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICAgQEBAQEBAICAgIEBAQEBAQCAgIA0KQEBAQEBAQEAgIEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICBAQEBAQEBAICAgQEBAQEBAQEAgIEBAQEBAQEBAQEBAICBAQEBAQEBAQCAgQEBAQCBAQEAgIEBAQEBAQEBAICBAQEBAQEBAICAgQEBAQEBAQCAgIA0KQEAhICBAQEAgIEBAISAgQEAhICBAQCEgIEBAISAgICAgICAhQEAgICAgICAgQEAhICBAQEAgIEBAISBAQCEgQEAhICBAQCEgICAgICAgQEAhQCFAQEAgIEBAISAgICAgICAhQEAgICAgICAgIUBAICAgICAgIA0KIUAhICBAIUAgICFAISAgIUAhICAhQCEgICFAISAgICAgICAhQCEgICAgICAgIUAhICBAIUAgICFAISAhQCEgIUAhICAhQCEgICAgICAgIUAhIUAhQCEgICFAISAgICAgICAhQCEgICAgICAgIUAhICAgICAgIA0KQCFAIUAhQCEgIEAhISAgISFAICBAIUAgIEAhISE6ISAgICAhIUBAISEgICAgQCFAICAhQCEgIEAhISAhIUAgQCFAICBAISEhOiEgICAgQCFAICEhQCEgIEAhISE6ISAgICAhIUBAISEgICAgISFAQCEhICAgIA0KISEhQCEhISEgICFAISAgISEhICAhQCEgICEhISEhOiAgICAgISFAISEhICAgIUAhICAhISEgICFAISAgICEgIUAhICAhISEhITogICAgIUAhICAhISEgICEhISEhOiAgICAgISFAISEhICAgICEhQCEhISAgIA0KISE6ICAhISEgICEhOiAgISE6ICAhITogICEhOiAgICAgICAgICAgICE6ISAgISE6ICAhISEgICEhOiAgICAgISE6ICAhITogICAgICAgISE6ICAhISEgICEhOiAgICAgICAgICAgICE6ISAgICAgICAhOiEgIA0KOiE6ICAhOiEgIDohOiAgOiE6ICA6ITogIDohOiAgICAgICAgICAgITohICAgOiE6ICAhOiEgIDohOiAgICAgOiE6ICA6ITogICAgICAgOiE6ICAhOiEgIDohOiAgICAgICAgICAgITohICAgICAgICE6ISAgIA0KOjogICA6OjogICA6Ojo6IDo6IDo6OiAgICA6OiA6Ojo6ICA6Ojo6IDo6ICAgOjo6OjogOjogIDo6OiAgICAgOjogICAgOjogOjo6OiAgIDo6ICAgOjogICA6OiA6Ojo6ICA6Ojo6IDo6ICAgOjo6OiA6OiAgIA0KIDogICA6IDogICAgOjogOiAgOiA6ICAgIDogOjogOjogICA6OiA6IDogICAgIDogOiAgOiAgICA6ICAgICAgOiAgICA6IDo6IDo6ICAgOjogICAgOiAgIDogOjogOjogICA6OiA6IDogICAgOjogOiA6
+    owner: root:root
+    path: /etc/motd
+    permissions: "0644"
+
+packages:
+  - qemu-guest-agent
+  - net-tools
+package_upgrade: true
+runcmd:
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent
+  - apt update
+  - apt upgrade -y
+  - echo "done" > /tmp/cloud-config.done
+EOF
+    file_name = "cloud-config-${each.key}-${random_id.cloud-config-k3s-worker[each.key].hex}.yaml"
   }
-
-  worker_node_ips = [for node in local.mapped_worker_nodes : node.ip]
 }
 
 resource "proxmox_virtual_environment_vm" "k3s-worker" {
@@ -40,7 +61,7 @@ resource "proxmox_virtual_environment_vm" "k3s-worker" {
   for_each = local.mapped_worker_nodes
 
   node_name   = coalesce(each.value.node, var.default_node_settings.node)
-  name        = "${var.cluster.name}-${each.key}"
+  name        = each.key
   vm_id       = each.value.vm_id
 
 
@@ -67,7 +88,7 @@ resource "proxmox_virtual_environment_vm" "k3s-worker" {
       domain = var.default_node_settings.searchdomain
       servers = [var.default_node_settings.nameserver]
     }
-    user_data_file_id = proxmox_virtual_environment_file.cloud_config.id
+    user_data_file_id = proxmox_virtual_environment_file.cloud-config-k3s-worker[each.key].id
   }
 
   disk {
