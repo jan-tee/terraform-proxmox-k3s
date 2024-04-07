@@ -24,8 +24,11 @@ users:
       - ${trimspace(data.local_file.ssh_public_key.content)}
     sudo: ALL=(ALL) NOPASSWD:ALL
 timezone: Europe/Berlin
+
 hostname: "${join("-", [var.cluster.name, "support"])}"
 fqdn: "${join("-", [var.cluster.name, "support"])}.${coalesce(var.support_node_settings.domain, var.default_node_settings.domain)}"
+prefer_fqdn_over_hostname: true
+
 write_files:
   - encoding: b64
     content: ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA0KIEBAQEBAQCAgIEBAQCAgQEBAICBAQEAgIEBAQEBAQEBAICAgQEBAQEBAICAgIEBAQEBAQCAgIEBAQEBAQEBAQEAgICBAQEBAQ
