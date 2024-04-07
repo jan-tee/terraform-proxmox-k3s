@@ -22,6 +22,7 @@ module "k3s" {
   default_node_settings = {
     nameserver   = "10.10.0.1"
     searchdomain = "k8s.lab"
+    domain = "at.home"
     node  = "laszlo"
     pool  = "k8s"
     disk_size    = 30
